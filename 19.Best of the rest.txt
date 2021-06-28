@@ -1,0 +1,93 @@
+Impala:
+Clodera's alternate to Hive
+massively parallel SQL engine on hadoop
+Impala is always running 
+	avoid the start up costs when starting a Hive query
+	made for BI style queries
+Impala maybe preferred over hive when using cloudera
+Impala is faster than hive,but hive offers more versality
+
+Accumulo:
+another BigTable clone(like Hbase)
+offers better security model
+	cell based access control
+server side programming
+preferred in case of complex security requirements
+
+Redis:
+A distributed in-memory data store(like memcache)
+good support for storing data structure
+can persist data to a disk
+can be used as a data store,not just as a cache
+popular caching layer for web apps
+
+Ingite:
+in memory data fabric
+alternative to redis
+closer to the database
+	-ACID guarantees
+	-SQL support
+	-but all done in memory
+
+Elasticsearch:
+a distributed document search and analytics engine
+really popular - 
+	wikipedia,stackoverflow..
+can handle things like real-time search-as-you-type
+when paired with kibana,great for interactive exploration
+amazon offers an elasticsearch service
+
+
+Kinesis:
+AWS version of kafka
+Amazon has whole ecosystem on its own
+	Elastic map reduce
+	s3
+	elasticsearch service/cloudsearch
+	dynamodb
+	elasticache
+	AI/ML services
+EMR - easy way to spin up a hadoop cluster on demand
+
+Apache Nifi:
+Directed graphs of data routing
+	can connect to kafka,hdfs,hive
+Web UI for designing complex systems
+often seen in the context of IoT sensors and managing their data
+Relevant in that it can be a streaming data source for streaming applications
+
+Falcon
+Data governance engine that sits on top of oozie
+included in hortonworks
+like Nifi,it allows construction of data processing graphs
+but its really meant to oraganize the flow of data within hadoop
+
+apache slider:
+Deployment tool for apps on a Yarn cluster
+allows monitioring of your apps
+allows growing or shrinking the deployment as its running
+manage mixed configurations
+start/stop applications on your custer
+incubating
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

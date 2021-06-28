@@ -1,0 +1,134 @@
+Phoenix:
+only for HBase - gives sql interface to Hbase
+A sql driver for the HBase
+useful for fast,low latency OLTP support
+originally developed by salesforce,then opensourced
+Exposes a jdbc connector for HBase
+supports secondary indices and user defined functions
+integrates with mapreduce,spark,hive,pig and flume
+
+Why phoenix:
+really fast, wont pay a performance cost from having the extra layer 
+on top of HBase
+Hbase is still fundamentally non-relational
+
+Why phoenix over HBase:
+apps and analysts,may find sql easier to work with.
+it can do the work of optimizing more complex queries for you
+
+why phoenox over Drill:
+choose the right tool for the job
+
+Using  phoenix:
+CLI
+Phoenix API for java
+JDBC Driver
+Phoenix Query Server
+JAR's for mapreduce,hive,pig,flume and spark
+
+*********************************
+set up users table for movieLens
+store and load data to it through pig integration
+
+cd /usr/hdp/current/phoenix-client/
+cd bin
+python sqlline.py
+
+!tables
+CREATE TABLE IF NOT EXISTS us_population(
+	state CHAR(2) NOT NULL,
+	city VARCHAR NOT NULL,
+	population BIGINT,
+	CONSTRAINT my_pk PRIMARY KEY(state,city));
+
+!tables
+
+UPSERT INTO US_POPULATION VALUES('NY','NEW YORK',8143197);
+UPSERT INTO US_POPULATION VALUES('CA','LOS ANGELES',3844829);
+
+SELECT * FROM US_POPULATION;
+
+SELECT * FROM US_POPULATION WHERE STATE = 'CA'
+
+DROP TABLE US_POPULATION
+
+!tables
+!quit
+
+
+*******************************
+pheonix bin directory:
+python sqlline.py
+
+create table users(
+	userid integer not null,
+	age integer,
+	gender char(1),
+	occupation varchar,
+	zip varchar,
+        constraint  pk primary key(userID));
+
+!tables
+!quit
+
+home directory:
+cd /home/1996m
+ls
+mkdir ml-100k
+cd ml-100k
+wget http://mediasundog-soft.com/hadoop/ml-100k/u.usr
+
+home directory:
+cd ..
+pwd
+phoenix.pig script:
+
+REGISTER /user/hdp/current/phoenix-client/phoenix-client.jar
+
+users = LOAD '/user/1996m/ml-100k/u.user'
+USING PigStorage('|')
+AS (USERID:int,AGE:int,GENDER:chararray,OCCUPATION:chararray,ZIP:chararray);
+
+#stored into hbase using phoenix connector
+STORE users into 'hbase://users' using
+	org.apache.phoenix.pig.PhoenixHBaseStorage('localhost','-batchSize 5000');
+
+#get userid and occu from hbase 
+occupations = LOAD 'hbase://table/users/USERID,OCCUPATION' using
+org.apache.phoenixHBaseLoader("localhost");
+
+grpd = GROUP occupations BY OCCUPATION;
+cnt = FOREACH grpd GENERATE group AS OCCUPATION,COUNT(occupations);
+DUMP cnt;
+
+pig phoenix.pig
+
+cleanup : 
+
+pheonix bin directory:
+python sqlline.py
+
+select * from users limit 10;
+drop table users;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

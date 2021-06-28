@@ -1,0 +1,119 @@
+Presto:
+
+lot like Drill
+can connect to many different "big data" databases and 
+	data stores at once and query across them
+familiar sql syntax
+optimized for OLAP - analytical queries,data warehousing
+ (not for low latency transactions)
+
+
+exposes(other things can sit on top of presto)
+JDBC , command line and tableau interfaces
+
+still partially maintained by facebook
+
+
+Why presto?
+
+Vs drill , cassandra connector that's not present in drill
+used in fb , drop box and airbnb
+presto query can combine data from multiple sources,allowing
+	analytics across entire organization
+
+
+What can presto connect to?
+cassandra
+hive
+mongodb
+mysql
+local files
+kafka, jmx, postgreSQL , redis , Accumulo
+
+
+*****************************************************************
+activity:
+set up presto
+query hive ratings table using presto
+query users table in cassandra with presto
+execute query that joins users in cassandra with ratings in hive
+
+-install presto
+-set config properties
+(bunch of config files that needs to set up and will differ for the applications)
+-install package
+
+
+To start presto:
+bin/launcher start
+and connect to UI dashboard
+
+bin/presto --server 127.0.0.1:8090 --catalog hive
+presto>
+show tables from default;
+select * from default.ratings limit 10;
+
+select * from default.ratings where ratings = 5 limit 10;
+
+select count(*) from default.ratings where ratings = 1 limit 10;
+
+cleanup bin/launcher stop
+
+*******************************************************************
+service cassandra start
+#this is done for presto to connect with cassandra
+nodetool enablethrift
+
+cqlsh --cqlversion="3.4.0"
+>describe keyspaces;
+>use movielens;
+>select * from users limit 10;
+>quit
+
+set up cassandra config file in presto:
+set up in home/1996m/presto-server/etc/catalog
+
+open vi editor and type this:
+cassandra.name = cassandra
+cassandra.contact-points = 127.0.0.1
+
+start presto
+bin/launcher start
+bin/presto --server 127.0.0.1:8090 --catalog hive,cassandra
+
+presto>
+show tables from cassandra.movielens
+describe cassandra.movielens.users;
+
+select * from cassandra.movielens.users limit 10;
+
+select * from hive.default.ratings limit 10;
+
+#no of ratings grouped by occupations
+select u.occupation,count(*)
+from hive.default.ratings r
+join cassandra.movielens.users u
+on r.user_id = u.user_id
+group by u.occupation 
+
+>quit
+bin/launcher stop
+service cassandra stop
+
+External sql engines: drill,phoenix and presto
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,157 @@
+Apache storm
+
+another framework for processing continuos streams of data on a cluster
+	-can run on top of YARN(like spark)
+Works on individual events,not micro batches(like spark streaming)
+	useful incase of sub second latency
+
+Terminology:
+A stream consists of tuples that flow though
+Spouts -- sources of stream data - kafka,twitter
+Bolts -- process stream data as it's received
+	-transform,aggregate,write to databases/HDFS
+	-- the process keeps going on forever and update the table endlessly
+Topology:
+	graph of spouts and bolts that process your stream
+
+Storm Architecture
+Nimbus -(zoo keepers) -(supervisors)
+
+developing storm applications:
+usually done with java
+Storm core
+	lower level API for storm
+	"atleast one" sematics - duplicates 
+trident
+	sits on top of storm
+	higher level API for storm
+	"exactly once" sematics (spark streaming does this)
+	uses micro batches
+
+storm runs applications forever once submitted,until explicitly stop them 
+
+storm vs spark streaming
+offers tumbling windows(not overlapping events)
+kafka + storm popular combination
+
+example: wordcount 
+
+spout(random sentence generator) -> boult(split into words) -> bolt(keep count of words and emit results )
+
+cd /usr/hdp/current
+cd storm-client/
+ls
+
+cd contrib/storm-starter/src/jvm/org/apache/storm/
+ls
+cd starter
+pwd
+
+example - wordcounttopology
+
+storm jar /usr/hdp/current/storm-client/contrib/storm-starter/storm-starter-topologies-*.jar org.apache.storm.starter.WordCountTopology wordcount
+
+port : 8744
+
+to check the checkpoint:
+cd /usr/hdp/current/storm-client/logs
+ls
+cd workers-artifacts/
+ls
+cd wordcount-123456
+ls
+cd 6700
+
+note: remember to kill storm
+__________________________________________________________________
+
+Flink
+
+another stream processing engine - use events and not micro batching
+most similar to Storm
+can run on standalone,YARN or Mesos
+Highly scalable
+Fault tolerant
+	can survive failures while still guaranteeing exactly-once processing(financial transactions)
+	uses "state snapshots" to achieve this
+up and coming quickly
+
+flink vs spark streaming vs storm
+
+flink is faster than storm
+offers real streaming like storm
+higher level API like trident or spark , but with real time streaming
+good scala support
+own ecosystem
+process data based on event times,not when data was received
+
+sparks structured streaming paves the way for real event based streaming in spark
+
+Architecture:
+
+standalone cluster, yarn/hadoop , aws- google cloud ,local -->
+Flink runtime -->
+provides two sets realtime -DataStream API , batch - DatasetAPI -->
+DataStream{CEP , table} , Dataset{flink,gelly,table}
+
+Connectors:
+HDFS
+Cassandra
+kafka
+others - elastic search,NiFi ,Redis,RabbitMQ
+
+Example:
+flink in stand alone
+
+./bin/start-local.sh
+word count
+
+start netcat:
+nc - 9000
+linux utility broadcast the console input to the tcp port
+
+Start streaming job:
+./bin/flink run examples/streaming/SocketWindow WordCount.jar --port 9000
+
+see the log files
+cd flink-1.2.0
+cd log/
+ls -ltr
+cat flink-1996m-jobmanager
+
+cleanup - kill all the processes
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

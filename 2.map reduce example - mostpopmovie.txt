@@ -1,0 +1,44 @@
+#example - how many of each movie rating exist?
+#python code
+
+from mrjob.job import MRJob
+from mrjob.step import MRstep
+
+class RatingsBreakdown(MRJob):
+	#defining which fns are mappers and reducers
+	def steps(self):
+		return [
+			MRStep(mapper = self.mapper_get_ratings,
+			      (reducer = self.reducer_count_ratings)
+		]
+
+	#mapper fn called for each line
+	def mapper_get_ratings(self, _,line):
+		#split line and throw the values to the tuple
+		(userID,movieID,rating,timestamp) = line.split('\t')
+		#key-value pair
+		yield rating,1
+
+	#reducer fn called for each unique key i.e the ratings
+	#values - iterator
+	def reducer_count_rating(self, key, values):
+		yield key, sum(values)
+
+if__name__ == '__main__':
+	RatingsBreakdown.run()
+
+
+Installing guidelines/requirements HDP 2.6.5
+pip - utiliy for installing python packages
+	yum install python-pip
+mrjob
+nano (text editor)
+scriptss and data
+
+
+running on hadoop cluster:
+python mostpopmovie.py -r hadoop -hadoop_streaming-jar linkwherestreamingjar data/datalocationinhdfs
+
+running on local disk:(no need of any hadoop) - may use conda for python env
+python ratingbreakdown.py u.data
+

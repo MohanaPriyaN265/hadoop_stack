@@ -1,0 +1,144 @@
+Flume:
+another way to stream data into your cluster
+made from start with hadoopn in mind
+	-built in sinks for HDFS and HBase
+	-can act as buffer netween hdfs and hbase
+Originally made to handle log aggregation
+
+Anatomy:
+web servers - (source - channel - sink) -hbase
+
+Components:
+Source:
+where the data is coming from
+can optionally have channel selectors and interceptors
+
+channel:
+how the data is transferred (via memory or files)
+
+sink:
+where the data is going
+can be organized into sink groups
+a sink can connect to only one channel
+	-channel is notified to delete a message once the sink process it
+
+Built in source types
+built in sink types
+
+Using avro,agents can connect to other agents as well
+smoothes the traffic - acts as buffer between your data and your cluster
+
+***************
+simple flow:
+source(netcat) -->
+channel(memory) -->
+sink(logger)
+
+example.conf:
+
+#example.conf:A single node Flume configuration
+
+#name the components on this agent
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+
+#describe/configure the source
+a1.source.r1.type = netcat
+a1.source.r1.bind = localhost
+a1.sources.r1.port = 44444
+
+#describe the sink
+a1.sinks.k1.type = logger
+
+#use a channel which buffrers events in memory
+a1.channels.c1.type = memory
+a1.channels.c1.capacity = 1000
+a1.channels.c1.transactionCapacity = 100
+
+#bind the source and sink to the channel
+a1.sources.r1.channels = c1
+a1.sinks.ki.channel =c1
+
+cd /usr/hdp/current/flume-server/
+
+Launching the agent:
+bin/flume-ng agent --conf conf --conf-file ~/example.conf --name a1 -Dflume.root.logger = INFO,console
+
+
+Souce side:
+telnet localhost 44444
+typing messages
+
+quit
+
+**************************************
+log spool to HDFS:
+files -->
+source:spooldir,timestamp interceptor -->
+channel:memory -->
+sink --> 
+HDFS
+
+flumelogs.conf
+
+# flumelogs.conf: A single-node Flume configuration
+
+# Name the components on this agent
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+
+# Describe/configure the source
+a1.sources.r1.type = spooldir
+a1.sources.r1.spoolDir = /home/1996m/spool
+a1.sources.r1.fileHeader = true
+#append timestamp to the new file coming into the directory spooldit
+a1.sources.r1.interceptors = timestampInterceptor
+a1.sources.r1.interceptors.timestampInterceptor.type = timestamp
+
+# Describe the sink
+a1.sinks.k1.type = hdfs
+a1.sinks.k1.hdfs.path = /user/maria_dev/flume/%y-%m-%d/%H%M/%S
+a1.sinks.k1.hdfs.filePrefix = events-
+a1.sinks.k1.hdfs.round = true
+a1.sinks.k1.hdfs.roundValue = 10
+a1.sinks.k1.hdfs.roundUnit = minute
+
+# Use a channel which buffers events in memory
+a1.channels.c1.type = memory
+a1.channels.c1.capacity = 1000
+a1.channels.c1.transactionCapacity = 100
+
+# Bind the source and sink to the channel
+a1.sources.r1.channels = c1
+a1.sinks.k1.channel = c1
+
+setup the directory
+
+#dropping the files here
+mkdir spool
+
+#create folder flume in hdfs
+
+#launching the agent
+bin/flume-ng agent --conf conf --conf-file ~/flumelogs.conf --name a1 -Dflume.root.logger = INFO,console
+
+add files to spool directory and see the filestructure  in HDFS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

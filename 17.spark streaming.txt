@@ -1,0 +1,236 @@
+Spark streaming:
+Processing continous streams of data in near-real-time
+
+why spark streaming?
+Analyze data streams in real time,instead of in huge batch jobs daily
+
+Spark streaming:
+
+Data streams -->
+receivers --->
+Rdds (batches of data for a given time increment)  (D streams)-->
+transform and output to other systems
+
+Processing of RDD's can happen in parallel on differnt worker nodes
+
+Dstreams:
+Abstraction of these chuncks of rdd's is called Dstreams(Discretized streams)
+Generates the Rdd's for each time step and can produce output at each time step
+Can be transformed and acted on like Rdd's
+Or access the underlying Rdd's if you need them
+
+Some stateless tranformations on Dstreams:
+Map
+Flatmap
+Filter
+reduceByKey
+
+Stateful data:
+Maintain long lived state on a Dstream
+for example - running totals,broken down by keys
+	      aggregating session data in web activity
+
+windowed Transformations:
+allow you to compute results across a longer time period than the batch interval
+
+Ex:
+top-sellers from the past hour
+	-might process data every one second(the batch interval)
+	-but maintain a window of one hour
+
+the window slides as time goes on ,to represent batches within the window interval
+
+Batch interval:
+	how often data is captured into a Dstream
+Slide interval:
+	how often a windowed transformation is computed
+Window interval:
+	how far back in time the windowed transformation goes
+
+
+Structured Streaming:
+A new higher level API for streaming structured data
+uses datasets:
+	like a dataframe but with more explicit type information
+	A dataFrame is really a DataSet[Row]
+
+Imagine like a dataframe that never ends,
+	new data in stream = new rows appended to input table
+	continous application keeps querying updated data as it comes
+
+Advantages of structured streaming:
+streaming code looks lot like a equivalent of non streaming code
+structured data allows for query optimization oppurtunities and better performances
+interoperability with other spark components based on datasets
+	-as dataset in general is direction where spark is moving
+
+*********************************************************
+Spark streaming with flume:
+logs -->
+flume[spooldir(source) -->
+channel(memory) -->
+sink(avro)] -->
+spark streaming -->
+console
+
+use a window to aggregate how often each unique url appears from our access log
+
+
+flume configuration: avro sink
+# sparkstreamingflume.conf: A single-node Flume configuration
+
+# Name the components on this agent
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+
+# Describe/configure the source
+a1.sources.r1.type = spooldir
+a1.sources.r1.spoolDir = /home/1996m/spool
+a1.sources.r1.fileHeader = true
+a1.sources.r1.interceptors = timestampInterceptor
+a1.sources.r1.interceptors.timestampInterceptor.type = timestamp
+
+# Describe the sink
+a1.sinks.k1.type = avro
+a1.sinks.k1.hostname = localhost
+a1.sinks.k1.port = 9092
+
+# Use a channel which buffers events in memory
+a1.channels.c1.type = memory
+a1.channels.c1.capacity = 1000
+a1.channels.c1.transactionCapacity = 100
+
+# Bind the source and sink to the channel
+a1.sources.r1.channels = c1
+a1.sinks.k1.channel = c1
+*****************************
+sparkstreaming script: sparkflume.py
+
+import re
+
+from pyspark import SparkContext
+from pyspark.streaming import StreamingContext
+from pyspark.streaming.flume import FlumeUtils
+
+//using regular expression to pattern match and extract info from the access log
+parts = [
+    r'(?P<host>\S+)',                   # host %h
+    r'\S+',                             # indent %l (unused)
+    r'(?P<user>\S+)',                   # user %u
+    r'\[(?P<time>.+)\]',                # time %t
+    r'"(?P<request>.+)"',               # request "%r"
+    r'(?P<status>[0-9]+)',              # status %>s
+    r'(?P<size>\S+)',                   # size %b (careful, can be '-')
+    r'"(?P<referer>.*)"',               # referer "%{Referer}i"
+    r'"(?P<agent>.*)"',                 # user agent "%{User-agent}i"
+]
+pattern = re.compile(r'\s+'.join(parts)+r'\s*\Z')
+
+#takes each line in access log and return the url info requested for
+def extractURLRequest(line):
+    exp = pattern.match(line)
+    if exp:
+        request = exp.groupdict()["request"]
+	#split request further to extract url
+        if request:
+           requestFields = request.split()
+           if (len(requestFields) > 1):
+                return requestFields[1]
+
+
+if __name__ == "__main__":
+
+    sc = SparkContext(appName="StreamingFlumeLogAggregator")
+    sc.setLogLevel("ERROR")
+    #batch interval 1 sec
+    ssc = StreamingContext(sc, 1)
+
+    #push model
+    flumeStream = FlumeUtils.createStream(ssc, "localhost", 9092)
+
+    lines = flumeStream.map(lambda x: x[1])
+    urls = lines.map(extractURLRequest)
+
+    # Reduce by URL over a 5-minute window sliding every second
+    urlCounts = urls.map(lambda x: (x, 1)).reduceByKeyAndWindow(lambda x, y: x + y, lambda x, y : x - y, 300, 1)
+
+    # Sort and print the results
+    sortedResults = urlCounts.transform(lambda rdd: rdd.sortBy(lambda x: x[1], False))
+    sortedResults.pprint()
+
+    # need the checkpoint to store the state , needed in case of windowed operation
+    ssc.checkpoint("/home/1996m/checkpoint")
+    ssc.start()
+    ssc.awaitTermination()
+
+
+other steps:
+
+mkdir checkpoint
+spark-submit --packages org.apache.spark:spark-streaming-flume_2.11:2.0.0 SparkFlume.py
+
+Start flume:
+cd /usr/hdp/current/flume-server/
+bin/flume-ng agent --conf conf --conf-file ~/sparkstreamingflume.conf --name a1
+
+put the log files in the spool directory access_log.txt
+
+
+****************************************************************************
+
+how many times each http status code is seen changing the status code to 5 seconds
+
+import re
+
+from pyspark import SparkContext
+from pyspark.streaming import StreamingContext
+from pyspark.streaming.flume import FlumeUtils
+
+//using regular expression to pattern match and extract info from the access log
+parts = [
+    r'(?P<host>\S+)',                   # host %h
+    r'\S+',                             # indent %l (unused)
+    r'(?P<user>\S+)',                   # user %u
+    r'\[(?P<time>.+)\]',                # time %t
+    r'"(?P<request>.+)"',               # request "%r"
+    r'(?P<status>[0-9]+)',              # status %>s
+    r'(?P<size>\S+)',                   # size %b (careful, can be '-')
+    r'"(?P<referer>.*)"',               # referer "%{Referer}i"
+    r'"(?P<agent>.*)"',                 # user agent "%{User-agent}i"
+]
+pattern = re.compile(r'\s+'.join(parts)+r'\s*\Z')
+
+#takes each line in access log and return the url info requested for
+def extractURLRequest(line):
+    exp = pattern.match(line)
+    if exp:
+        request = exp.groupdict()["status"]
+
+
+if __name__ == "__main__":
+
+    sc = SparkContext(appName="StreamingFlumeLogAggregator")
+    sc.setLogLevel("ERROR")
+    #batch interval 1 sec
+    ssc = StreamingContext(sc, 1)
+
+    #push model
+    flumeStream = FlumeUtils.createStream(ssc, "localhost", 9092)
+
+    lines = flumeStream.map(lambda x: x[1])
+    urls = lines.map(extractURLRequest)
+
+    # Reduce by URL over a 5-minute window sliding every second
+    urlCounts = urls.map(lambda x: (x, 1)).reduceByKeyAndWindow(lambda x, y: x + y, lambda x, y : x - y, 300, 5)
+
+    # Sort and print the results
+    sortedResults = urlCounts.transform(lambda rdd: rdd.sortBy(lambda x: x[1], False))
+    sortedResults.pprint()
+
+    # need the checkpoint to store the state , needed in case of windowed operation
+    ssc.checkpoint("/home/1996m/checkpoint")
+    ssc.start()
+    ssc.awaitTermination()
+
+

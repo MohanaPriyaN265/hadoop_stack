@@ -1,0 +1,197 @@
+running VM - Virtual Box
+
+cloudera - hortonworks sandbox
+recommended - 2.6.5(15 GB)
+It is pre-installed hadoop stack with associated technologies coming as 
+a whole package
+
+for datasets: grouplens.org imdb movie
+
+
+Ambari - visualize what's going in hadoop stack 
+platform - HDP (available until 2019)
+         - merged with cloudera in 2019
+recent one - CDP(actually need cluster to run)
+	   - no sandbox as of 2019
+
+Hadoop - s/w platform for distributed storage (hdfs)
+			and distributed processing (yarn)
+
+GFS and Map Reduce papers by Google in 2003 - 2004
+Hadoop developed in Yahoo from 2006
+
+Why Hadoop? big data -with horizontal scaling is linear
+	not just for batch processing anymore
+________________________________________________________
+Core Hadoop System
+HDFS ,yarn
+pig - scripting language on top of map reduce ,no need of java coding
+	and python - converts to mappers and reducers jobs
+Hive - sits on top of mapreduce and allows us to write SQL queries 
+	to retrieve info from distributed storage system(makes
+	HDFS look like a relational database
+mesos - manage resources on the cluster
+spark - sits on top of yarn or mesos
+      - faster computations 
+tez   - like spark uses DAG ,generally used in conjunction with Hive
+	for optimised queries
+HBase - columnar datastore (OLTP , websites)
+Storm - processing streaming data quickly and in real time
+	(differs slightly in working from spark streaming)
+oozie - way of scheduling jobs and run those jobs reliably 
+zookeeper - co-ordinating everything on the cluster,keeps track 
+	of shared states between applications
+scoop - connector between hdfs and legacy databased(like jdbc,odbc)
+flume - real time ingestion - tranporting web logs and publish real time 
+	into cluster
+kafka - collect data from different clusters and sources,
+	and broadcast them to the hadoop cluster
+
+External data storage 
+MySql; cassandra,mongoDB - columnar storage
+
+Query Engines - 
+Apache Drill - allows to write sql queries to talk across cassandra,
+	mongoDB,hive..
+Hue - takes the roll of ambari for cloudera
+    - used to execute hive queries
+phoenix - ACID guaranties for No-sql data store
+Zeppelin - notebook UI approach for the cluster
+
+_____________________________________________________
+***************HDFS*****************
+-handles big files
+-splits files into blocks 128 mb and distributed among 
+different commodity machines allowing parallel processing
+-reliable as it maintains copies of the blocks
+-Architecture - namenode(keeps track of info on datanodes)
+	 and datanodes(actually stores data,talk between themselves
+	for maintaining reliability)
+-client node - first talks to name node - to get info
+ client node - directly talks to data nodes to read and write data
+		reading a file
+		writing a file
+-Name node reselience - 
+	method 1 :writes to local disk and NFS - metadata
+	method 2: secondary name nodes - maintains merged copy of 
+		edit logs we can use to restore
+	HDFS federation - separate namenodes for separate spaces
+		in case a single name node couldn't handle it 
+
+HDFS high availability - in case if dont want any downtime
+	-hot standby namenode
+	-uses zookeeper to track active namenode
+	-ensure only one namenode is used at time,takes extreme measures
+
+Using HDFS:
+	UI - Ambari(like giant hard drive)
+	command line interface
+	http/HDFS proxies
+	java interface
+	NFS gateway(mounting remote file system to a system)
+__________________________________________________________
+
+
+step 1: upload data from local disk to HDFS 
+method1:using http interface(ambari)
+method2: using command line interface:
+	putty for windows to ssh connection with the virtual sandbox
+
+commands:
+hadoop fs -ls
+hadoop fs -mkdir ml-100k
+wget datalink(this is in local)
+hadoop fs -copyFromLocal u.data ml-100k/u.data
+hadoop fs -toLocal(transfer from hdfs to local disk)
+hadoop fs -ls ml-100k
+hadoop fs -rm ml-100k/data
+hadoop fs -rm ml-100k
+other commands:
+hadoop fs
+
+___________________________________________________________________
+*************mapreduce***************************
+
+Mapped - transformed
+Reduced - aggregate
+How many movies did each user rate in the MovieLens data set?
+Convert to mapper reducer problem:
+
+mapper converts raw source data(each line) into key/value pairs
+Mapper part - input data - mapper - key/value pairs
+According to our scenario:
+key is user id and value is movie.{k1:v1,k2:v2,k1:v2}
+try to elimate all other useless columns to reduce traffic
+here,same key can occur multiple times: a user would have rated multiple times
+
+shuffle and sort stage - done under the hood automatically
+map-reduce sorts and groups the mapped data
+user1:movie1,movie2  and user2:movie1
+here,the keys are sorted as well
+
+Reducer - process each key's values
+user1:movie1,movie2  and user2:movie1  --> len(movies) --> user1:2 user:1
+
+summarising -- raw data -- mapper -- shuffle and sort -- reducer
+
+Mapreduce job on hadoop cluster:
+since the raw data is split into partitions,each name node can process few lines
+now,same keys can be distributed in different machines
+in shuffling stage - uses like hash set for shuffling and sorting
+In reduce - each reducer handles few keys and does the aggregation the values
+All the above tasks are capable of running parallelly
+
+Streaming in mapreduce - allows interfacing with other languages(python)
+
+___________________________________________________________________________
+example - how many of each movie rating exist?
+Using hadoop - not used anymore
+ but one of the basic building blocks to understand and solve big data
+
+Turn the problem into map-reduce
+map - tranform each line to (rating,1)
+(ie how many 3s are, how many 1s are there
+shuffle and sort - automatically done
+reduce - sum the values
+
+#python code
+#mapper fn called for each line
+def mapper_get_ratings(self, _,line):
+	#split line and throw the values to the tuple
+	(userID,movieID,rating,timestamp) = line.split('\t')
+	#key-value pair
+	yield rating,1
+
+#reducer fn called for each unique key i.e the ratings
+#values - iterator
+def reducer_count_rating(self, key, values):
+	yield key, sum(values)
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	 
+
+
+
+
+
+

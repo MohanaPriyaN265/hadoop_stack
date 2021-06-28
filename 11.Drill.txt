@@ -1,0 +1,76 @@
+Querying data interactively:
+
+Query engines:
+Apache Drill - sql queries across hdfs,mongodb,s3...
+	     - not cassandra
+Hue  
+Apache phoenix - sits on HBASE
+presto - made by facebook,now an open source
+       - works on cassandra,not on mongoDB
+Apache Zeppelin
+
+
+Apache Drill:
+SQL for no-SQL 
+Query engine for a variety of non relational databases and data files
+
+hive,mongoDB,Hbase
+flat json,parquet files on hdfs,s3,azure,google cloud,local file system
+odbc/jdbc driver so other tools(like tableu) can connect to it just like
+	a relational database 
+
+based on google's Dremel
+
+Still non relational databases under the hood
+	internally data is represented as JSON and so has no fixed schema
+
+joins across different database technologies
+	like sql for entire database
+
+****************************************************************************
+example: import data into hive and mongoDB
+	set up drill on top of both
+	and do queries
+
+Hive
+Create database movielens;
+upload data  from local  - ratings data
+
+have mongodb import data from hdfs -user data
+
+install drill - choose version compatable with the environment
+
+start:
+bin/drillbit.sh start -Ddrill.exec.port = 8765
+#use port that is open and unused
+
+enable storage plugins for hive and mongodb
+edit the configurations and port numbers for hive and mongodb
+
+SELECT * FROM hive.movielens.ratings LIMIT 10;
+
+SELECT * FROM mongo.movielens.users LIMIT 10;
+
+SELECT u.occupation,COUNT(*) FROM hive.movielens.ratings r
+JOIN mongo.movielens.users u
+ON r.user_id = u.user_id
+GROUP BY u.occupation;
+
+bin/drillbit.sh
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

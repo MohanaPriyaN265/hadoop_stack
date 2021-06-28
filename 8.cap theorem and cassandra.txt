@@ -1,0 +1,159 @@
+Cassandra
+-engineered for high availability
+-distributed database
+-no master node - every node runs the same s/w and 
+	performs the same functions
+-data model - similar to HBase
+-non relational - limited CQL query language
+
+
+Cassandra design choices:
+
+CAP theorem:
+the cap theorem says you can only have 2 out of 3:
+consistence - data written can be retrieved immedietly
+availability - service available at all times
+partition tolerance - can be easily split up and distributed
+
+partition tolerant - non negotiable for big data
+Cassandra choses availability over consistency
+-but it is "eventually consistent"
+-and specify the consistency requirements as part of your requests
+		"tunable consistency"
+
+
+******************************************
+where cassandra fits in CAP:
+CA = mysql
+AP = cassandra
+CP = hbase and mongoDB
+
+Cassandra architecture - gossip protocols
+	to communicate between nodes
+	-ring architecture
+
+
+cassandra in cluster:
+one ring can be used for info retrieval
+	-cassandra is great for fast access to rows of information
+
+replicate cassandra to another ring + hadoop
+	can be used for analytics and spark integration
+
+********************************
+CQL(cassandra CQL)
+no joins
+	-de normalized
+	-still non relational
+queries must be on some primary key
+	-secondary indices are supported
+
+CQLSH - crete table on command line
+
+All the tables must be in keyspace(db)
+
+********************************
+cassandra and spark:
+use spark for analytics on data stored in cassandra
+use spark to transfom data and store it into cassandra for transactional use
+
+datastax offers spark-cassandra connector
+
+allows to read and write cassandra as data frames
+
+*****************************************
+write spark output to cassandra 
+
+service cassandra start
+cqlsh
+
+1)create table
+CREATE KEYSPACE movielens WITH relplication = {'class':'SimpleStrategy',
+'replication_factor':'1'} AND durable_writes = true;
+
+
+USE movilens;
+
+CREATE TABLE users(user_id int, age int, gender text,occupation text,
+zip text,PRIMARY KEY (user_id));
+
+DESCRIBE movielens;
+
+SELECT * from users;
+
+#hashes the primary key to figure out which node the data goes into
+exit
+
+2)script
+
+from pyspark.sql import SparkSession
+from pyspark.sql import Row
+from pyspark.sql import functions
+
+def parseInput(line):
+	fields = line.split('|')
+	return Row(user_id = int(fields[0]),age = int(fields[1]),gender = fields[2],occupation = fields[3],zip = fields[4])
+	#need to match up with the cassandra database
+
+if __name__ = "__main__"
+	#create a spark session - need to mention where cassandra exists
+	spark = SparkSession.builder.appName("cassandraIntegration").config("spark.cassandra.connection.host","127.0.0.1")
+			.getOrCreate()
+
+	#get the raw data
+	lines = spark.sparkContext.texfile("hdfs:///user/1996m/ml-100k/u.user")
+	#convert it rdd of row objects with (userID , age,gender,occupation,zip)
+	users = lines.map(parseInput)
+	#convert that to a dataframe
+	usersDataset = spark.createDataFrame(users)
+
+	#write it to a cassandra
+	usersDataset.write\	
+		.format("org.apache.spark.sql.cassandra")\
+		.mode('append')
+		.options(table = "users" , keyspace = "movielens")\
+		.save()
+
+	# read it back from cassandra into a new dataframe
+	readUsers = spark.read\
+		.format("org.apache.spark.sql.cassandra")\
+		.options(table = "users" , keyspace = "movielens")\
+		.load()
+
+	readUsers.createOrReplaceTempView("users")
+	sqlDF =spark.sql("select * from users WHERE age < 20")
+	sqlDF.show()
+
+	#stop the session
+	spark.stop()
+
+
+execution: 
+spark-submit --packages datastax:spark-cassnadra-connector:2.0.0-M2-s_2.11 CassandraSpark.py
+
+check in cqlsh:
+USE movielens;
+SELECT * FROM users LIMIT 10;
+service cassandra stop
+
+
+	
+				
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+

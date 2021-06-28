@@ -1,0 +1,171 @@
+why nosql
+-very quickly give answers using simple queries forever and work on big data
+at high transactional rates
+-we need not need very rich sql database
+
+scaling up mysql to massive loads require extreme measures:
+denormalization
+caching layers
+master/slave setups
+sharding
+materialized views
+removing stored procedures
+
+which tool to use:
+for analytic queries, hive,pig,spark
+exporting data to mysql for most applications
+if working on giant scale - export data to non relational
+	database for fast and scalable serving of data to web applications(clients)
+
+______________________________________
+
+HBASE:
+built on top of hdfs
+non relational and scalable database
+based on google's big table
+
+there are no query languages -only crud api's
+create,read,update,delete
+
+Architecture:
+Hdfs(data itself is stored here) -->
+region servers (automatically redistributes and rearranges data as it grows) 
+Auto-sharding  -->
+HMaster - master-mindknows where everything is -->
+zookeeper -who currently is master
+
+HBASE data model
+fast access to any given row
+row - referenced by unique key
+column families - each row has some small no of column families
+	-consumes less space in terms of sparse data
+each cell can have many versions with given timestamps
+
+ways to acess hbase:
+hbase shell
+java API
+spark,hive,Pig
+rest service
+thrift service
+avro service
+
+_________________________________________________
+create HBASE with python via REST service
+
+create HBASE table movie ratings by users
+
+python client(user request) -->rest service(http requests) --> hbase-hdfs
+
+*****
+Before python env:
+(1.make sure hbase is running - open up the port 8080 for rest service to operate on - port forwarding)
+(2.run rest service - accepts requests from python script
+	/usr/hdp/currrent/hbase-master/bin/hbase-daemon.sh start
+	rest -p 8080 --infoport 8001)
+
+in python dev env:
+
+#rest client for HBASE - star base
+from starbase import connection
+c = connection("127.0.0.1","8000")
+
+ratings = c.table('ratings')
+
+if (ratings.exists()):
+	print("Dropping existing ratings table\n")
+	ratings.drop()
+#create table
+ratings.create('rating')
+
+#get dataset
+print("parsing the ml-100k ratings data..\n")
+ratingsFile = open("../download/ml-100k/u.data","r")
+
+#batch - deal with multiple row at a time
+batch = ratings.batch()
+
+#updates the batch with new rows
+for line in ratingFile:
+	(userID,movieID,rating,timestamp) = line.split()
+	#unique key and column family-(movieID,rating) for every movie rated by particular user
+	#so the length can vary for individual users
+	batch.update(userID,{'rating':{movieID: rating}})
+
+ratingFile.close()
+
+print("committing ratings data to Hbase via REST service\n")
+batch.commit(finalize = True)
+
+#send requests
+print("get back ratings for some users..\n")
+print("ratings for user ID 1:\n")
+print(ratings.fetch("1"))
+print("ratings for user ID 33:\n")
+print(ratings.fetch("33"))
+
+
+**clean up - /usr/hdp/currrent/hbase-master/bin/hbase-daemon.sh stop rest
+
+______________________________________________________________________________________
+
+populate hbase with pig to import data at scale(massive scale)
+
+few steps:
+Hbase table must be created ahead of time
+Relation must have unique key at first column,followed by subsequent
+	columns wanted in Hbase
+USING clause allows to STORE into HBase table
+
+hbase shell>
+#userinfo is the column family
+> create 'users','userinfo'
+
+--
+hbase.pig
+
+ratings = LOAD '/user/1996mona/ml-100k/u.user'
+	USING PigStorage('|')
+	AS (userID:int, age:int , gender:chararray , occupation: chararray , zip: int);
+#userID becomes unique ID and rest become column family - userinfo
+Store ratings INTO 'hbase://users'
+USING org.apache.pig.backend.hadoop.hbase.HBaseStorage (
+'userinfo: age,userinfo:gender,userinfo:occupation,userinfo:zip');
+
+execute - pig hbase.pig
+
+hbase shell>
+list
+scan 'users'
+
+to cleanup:
+diable 'users'
+drop 'users'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

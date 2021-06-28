@@ -1,0 +1,83 @@
+#how many times each movie occurs in the dataset
+from mrjob.job import MRJob
+from mrjob.step import MRstep
+
+class RatingsBreakdown(MRJob):
+	#defining which fns are mappers and reducers
+	def steps(self):
+		return [
+			MRStep(mapper = self.mapper_get_ratings,
+			      (reducer = self.reducer_count_ratings)
+		]
+
+	#mapper fn called for each line
+	def mapper_get_ratings(self, _,line):
+		#split line and throw the values to the tuple
+		(userID,movieID,rating,timestamp) = line.split('\t')
+		#key-value pair
+		yield movieID,1
+
+	#reducer fn called for each unique key i.e the ratings
+	#values - iterator
+	def reducer_count_rating(self, key, values):
+		yield key, sum(values)
+
+if__name__ == '__main__':
+	RatingsBreakdown.run()
+
+************************************
+#sort the movies by their number of ratings
+
+Example for multi-stage jobs:
+chaining map-reduce stages together like this:
+
+def steps(self):
+	return[
+		MRStep(mapper = 
+			reduce =),
+		MRStep(mapper = 
+		       reduce = )
+
+	]
+
+from mrjob.job import MRJob
+from mrjob.step import MRstep
+
+class RatingsBreakdown(MRJob):
+	#defining which fns are mappers and reducers
+	def steps(self):
+		return [
+			MRStep(mapper = self.mapper_get_ratings,
+			      #sum of count becomes the key here
+			       reducer = self.reducer_count_ratings),
+			#thisreducer is added to automatically sort the movies based on counts
+			MRStep(reducer = self.reducer_sorted_output)
+		]
+
+	#mapper fn called for each line
+	def mapper_get_ratings(self, _,line):
+		#split line and throw the values to the tuple
+		(userID,movieID,rating,timestamp) = line.split('\t')
+		#key-value pair
+		yield movieID,1
+
+	#reducer fn called for each unique key
+	#padding is used to sort propery the numbers
+	def reducer_count_rating(self, key, values):
+		yield str(sum(values)).zfill(5),key
+
+	#at this stage,after the reshuffling and sorting - for a count of say 100
+	#there may be more that one movies with that count
+	#so we unpack the iterator and associate a single movie to a count
+	def reducer_sorted_output(self,count,movies):
+		for movie in movies:
+			yield movie,count
+
+if__name__ == '__main__':
+	RatingsBreakdown.run()
+
+
+
+
+
+

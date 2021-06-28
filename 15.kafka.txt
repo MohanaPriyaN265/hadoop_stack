@@ -1,0 +1,137 @@
+Streaming with kafka:
+publish/subscribe messaging with kafka
+
+What is streaming?
+
+previously talked about processing historical,existing big data
+	-sitting on HDFS
+	-sitting in a database
+
+how new data gets into the cluster:
+	new log entries from the web serrvers
+	new sensor data from the IOT system
+	new stock trades
+
+Streaming lets publish data in real time,to the cluster
+	-can process it in real time as it comes in
+
+****
+How to get data from different data sources into the cluster?
+
+Kafka:
+general purpose publish/subscribe messsaging system
+kafka serves store all incoming messages from publishers for some period of time
+	and publishes them to a stream of data called a topic
+
+kafka consumers subscribe to one or more topics and receive data as its published
+
+a stream/topic can have many different consumers,all with their own position
+in the stream maintained
+
+How kafka scales:
+kafka itself may be distributed among many processes on many servers
+	-will distribute the storage of stream data as well
+
+consumers may also be distributed:
+	-consumers of the same group will have messages distributed amongst them
+	-consumers of different groups will get their own copy of each message
+
+***********************
+set up a topic
+	-publish some data to it and watch it get consumed
+set up file connector
+	-monitor a log file and publish additions to it
+
+
+cd /usr/hdp/current/kafka-broker
+ls
+cd bin
+./kafka-topics.sh --create --zookeeper sandbox.hortonworks.com:2181 --replication factor 1
+--partitions 1 --topic fred
+
+./kafka-topics.sh --list --zookeeper sandbox.hortonworks.com:2181
+
+#publish data
+./kafka-console-producer.sh --broker-list sandbox.hortonworks.com:6667 --topic fred
+this is data
+I am waiting patiently at the producer's side
+
+#consumer script 
+cd /usr/hdp/current/kafka-broker
+ls
+cd bin
+./kafka-console-consumer.sh --bootstrap-server sandbox.hortonworks.com:6667 --zookeeper localhost:2181 --topic fred --from-beginning
+#prints publisher messages
+
+****************************
+publishing web logs with kafka using connector:
+under conf folder:
+cd conf
+ls
+make copies of files needed:
+cp connect-standalone.properties ~
+cp connect-file-sink.properties ~
+cp connect-file-source.properties ~
+cd ~
+
+vi connect-standalone.properties
+change bootstrap.servers = sandbox.hortonworks.com:6667
+
+vi connect-file-sink.properties
+change file:
+file = /home/1996m/logout.txt
+topics = log-test
+:wq
+
+cp connect-file-source.properties
+file = /home/1996m/access_log_small.txt
+topic = log-test
+
+#consumer
+access_log_small - log file - download from sundog
+./kafka-console-consumer.sh --bootstrap-server sandbox.hortonworks.com:6667 --zookeeper localhost:2181 --topic log-test
+
+./connect-standalone.sh ~/connect-standalone.properties ~/connect-file-sink.properties ~/cp connect-file-source.properties 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+

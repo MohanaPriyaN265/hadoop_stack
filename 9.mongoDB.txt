@@ -1,0 +1,125 @@
+MongoDB:
+- managing HuMONGOus data
+- document based data model
+- consistency and partition tolerance model
+
+No real schema is enforced
+	can enforce a schema,but not required
+	can have different fields in every document if we want to
+	
+	no single key as in other databases
+		- create indices in any field or combination of fields
+		- 'shard' needs to be done on some indexed field
+
+	results in a lot of flexibility
+
+MongoDB -
+Databases - collections - documents
+
+Architecture:
+Replica sets - 
+single master 
+maintains  back up copies of your database instance across datacentres 
+-in case of fail-down secondary node is elected based on ping time
+
+sharding
+ranges of some indexed value specified are assigned to different replica sets
+
+App ser process - mongos - primary(atleast 3) --secondaries(for durability)
+
+Shell is a full javascript interpreter
+support many indices:
+	only one can be used for sharding
+	more than few are still discouraged
+	text indices for text searches
+	geospatial indices
+
+has built in aggregation capabilities - mapreduce,GridFS
+SQL connector available(cant do efficient joins yet )
+
+*****************************************************************************
+send movielens dataset to mongodb and retrieve back from momgodb
+
+Script:
+
+from pyspark.sql import SparkSession
+from pyspark.sql import Row
+from pyspark.sql import functions
+
+def parseInput(line):
+	fields = line.split('|')
+	return Row(user_id = int(fields[0]),age = int(fields[1]),gender = fields[2],occupation = fields[3],zip = fields[4])
+
+if __name__ = "__main__"
+	#create a spark session 
+	spark = SparkSession.builder.appName("mongoDBIntegration")
+			.getOrCreate()
+
+	#get the raw data
+	lines = spark.sparkContext.texfile("hdfs:///user/1996m/ml-100k/u.user")
+	#convert it rdd of row objects with (userID , age,gender,occupation,zip)
+	users = lines.map(parseInput)
+	#convert that to a dataframe
+	usersDataset = spark.createDataFrame(users)
+
+	#write it to a mongoDB
+	usersDataset.write\	
+		.format("org.mongodb.spark.sql.DefaultSource")\
+		.mode('append')\
+		.options('uri','mongodb://127.0.0.1/movielens.users')\
+		.save()
+
+	#read it back from mongodb into a new dataframe
+	readUsers = spark.read\
+		.format("org.mongodb.spark.sql.DefaultSource")\
+		.options('uri','mongodb://127.0.0.1/movielens.users')\
+		.load()
+
+	readUsers.createOrReplaceTempView("users")
+	sqlDF =spark.sql("select * from users WHERE age < 20")
+	sqlDF.show()
+
+	#stop the session
+	spark.stop()
+
+execution
+spark-submit --packages org.mongodb.spark:mongo-spark-connector_2.11:2.0.0 Mongoscript.py
+
+
+**********************
+
+mongoDb shell:
+can execute java script
+
+db.users.find({user_id:100})
+db.users.explain().find({user_id:100})
+
+//we need to setup index ourselves to be efficient
+db.users.createIndex({user_id:1})
+db.users.find({user_id: 100})
+
+//can do few complex queries - aggregate without using hadoop
+dg.users.aggregate(
+	[{$group: {_id: {occupation: "$occupation"},avgAge:{$avg : "$age"}}}
+	])
+db.users.count()
+
+db.getCollectionInfos()
+
+db.users.drop()
+
+make sure to close and clean up properly and 
+savely quit everything
+
+
+
+
+
+
+
+
+
+
+
+
+

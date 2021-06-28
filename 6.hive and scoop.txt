@@ -1,0 +1,156 @@
+What is hive?
+sits on top mapreduce or tez
+translates SQL queries to mapreduce or Tez jobs on your cluster
+
+hiveQl - similar to sql
+easy OLAP(online analytics proccesing) queries
+for more complex queries - pig or map reduce is used
+
+why not hive:
+not apprpriate in OLTP
+deals with de-normalized - under the hood its really not a rdbms
+no transcations,no record-level updates,inserts and deletes
+
+views - bit different from sql-sql has materialised views(has copies stored)
+can store results of a query into a view(logical construct)-persist,which subsequent queries can
+use as a table.
+allows to specify how structured data is stored and partitioned
+
+
+____________________________________________________________________________
+
+using hive to find the most popular movie
+sqoop import --connect jdbc:mysql://localhost/movielens 
+	--driver com.mysql.jdbc.Driver 
+	-- table movies
+
+*upload data - choose file type - u.data and u.item
+
+CREATE VIEW IF NOT EXIST topMovieIDs as
+SELECT movieID,count(movieID) as ratingCount
+from ratings
+GROUP BY movieID
+ORDER BY ratingCount DESC;
+
+SELECT n.title, ratingCount
+FROM topMoviesIDS t JOIN names n ON t.movies = n.movieID;
+
+DROP VIEW topMoviesIDs
+
+_______________________________________________________
+
+Hive - schema on read
+(hive makes it look like working in a rdb - schema on write)
+maintains metastore that contains schema (structure) and imparts 
+it on the unstructured data that is stored on HDFS when the data is read
+
+hive/warehouse/table - where the table lives
+
+CREATE TABLE ratings (
+	userID INT,
+	movieID INT,
+	reting INT,
+	time INT)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '/t'
+STORED AS TEXTFILE;
+
+LOAD DATA LOCAL INPATH '${env:HOME}/ml-100k/u.data'
+OVERWRITE INTO TABLE ratings;
+
+
+LOAD DATA - moves data from distributed filesystem into Hive
+LOAD DATA LOCAL - copies data from local filesystem(not big data) into hive,
+	keeping the original data untouched
+
+Managed (ownership by hive) vs External Table(dropping table, only metadata is deleted)
+
+CREATE EXTERNAL TABLE IF NOT EXIST ratings(
+	userID INT,
+	movieID INT,
+	rating INT,
+	time INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/data/ml-100k/u.data';
+
+Partitioning:
+store data in partitioned subdirectories
+for optimizations
+
+Using HIVE:
+interactive hive> prompt / CLI
+saved query files
+	hive -f /somepath/queries.hql
+through ambari/hue
+jdbc/odbc server
+thrift services
+oozie
+
+
+****************************************************
+find the movie with the highest average rating
+
+CREATE VIEW IF NOT EXIST topMovieIDs as
+SELECT movieID,AVG(rating) as avgRating ,count(movieID) as ratingCount
+from ratings
+GROUP BY movieID
+ORDER BY avgRating DESC;
+
+SELECT n.title,avgRating
+FROM topMoviesIDS t JOIN names n ON t.movies = n.movieID
+where ratingCount > 10;
+
+DROP VIEW topMoviesIDs
+
+this would result rows containing movies which that are rated 1 by only 1 person - not much meaningful
+so we add ratingCount to the query to remove this out
+
+_________________________________________________________
+
+Integrating mysql with hadoop
+
+Sqoop(sql+hadoop) - handle big data
+- kicks off mapreduce jobs to handle importing and exporting the data
+
+-mysql/postGres - multiple mappers -multiple partitions in hdfs
+
+**Sqoop - import data from mySQL to HDFS:
+sqoop import --connect jdbc:mysql://localhost/movielens 
+	--driver com.mysql.jdbc.Driver 
+	-- table movies
+
+**sqoop - import data from mySQL to HIVE:
+sqoop import --connect jdbc:mysql://localhost/movielens 
+	--driver com.mysql.jdbc.Driver 
+	--table movies
+	--hive-import
+
+Incremental imports:
+-keep relational database and hadoop in sync
+--check-column and --last-value
+
+**scoop - export data from hive to MySQL
+sqoop export --connect jdbc:mysql://localhost/movielens -m 1
+	--driver com.mysql.jdbc.Driver 
+	-- table exported_movies
+	--export dir /apps/hive/warehouse/movies
+	--input-fields-terminated-by '\0001'
+
+target must already exist in mysql with columns in expected order 
+To provide access to movielens database:
+GRANT ALL PRIVELEGES ON movielens.* to ''@'localhost';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

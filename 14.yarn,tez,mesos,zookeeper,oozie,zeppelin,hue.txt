@@ -1,0 +1,359 @@
+Hadoop YARN:
+*introduced in hadoop2
+*separates the problem of managing resources on your cluster from MapReduce
+*enabled development of mapreduce alternatives - spark,tez built on top of yarn
+
+cluster storage layer-manage storage layers(hdfs) -->
+cluster compute layer-manage compute layers(YARN) -->
+YARN applications(mapreduce,spark,tez)
+
+how yarn works:
+app talks with resource manager to distribute work to the cluster
+
+data locality:yarn will try to put processes on same node as the hdfs blocks
+
+can specify different scheduling options for applications
+-can run more than one application at once on your cluster
+-fifo,capacity, and fair schedulers
+
+************************************************************************
+TEZ
+-DAG framework
+-infrastructure that makes hive,pig or mapreduce jobs faster
+-replacement for mapreduce
+-constructs DAG for more efficient processing of distributed jobs
+		this eliminates unnecessary steps and dependencies
+-optimizes physical data flow and resource usage under the hood
+
+architecture: Tez sits on top Yarn
+
+tell hive and pig to use tez
+
+*************************************************************************
+MESOS
+came out of twitter
+system for managing resources across your data centres
+other than big data, it can allocate resources for web servers,small scripts
+meant to solve a general problem than Yarn -
+	general container management system
+
+It is not part of hadoop ecosystem
+
+spark and storm may both run mesos instead of yarn,
+spark was originally return on top of mesos
+
+Hadoop yarn can be integrated with mesos using myriad
+
+Differences between mesos and yarn:
+
+Yarn - monolithic scheduler - you give a job and yarn figure out where to run it
+Mesos - makes offers of resources to the application(framework) which decides
+	whether to accept it or reject
+	- can also choose our own scheduling algorithm
+
+yarn is optimised for long,analytical jobs we see in map reduce
+mesos does this and as well as long loved processes(servers),short lived processes
+
+how mesos fits in?
+
+when you want a architecture where you can code all of organization's cluster application
+	other alternatives in this catgory - kubernetes/docker
+
+if using only hadoop and storm - can use mesos
+if data is in hdfs - yarn is better
+
+
+*****************************************************************************
+Zookeeper
+-coordinating the cluster
+-basically keeps track of information that must be synchronised across your cluster
+	which node is the master?
+	what tasks are assigned to which workers?
+	which workers are currently available?
+-tool that applications can recover from partial failures in the cluster
+
+-integral part of HBase, High avaiilability mapreduce ,drill,storm and much more
+
+Failure nodes:
+master crashes : needs to fail over to a backup
+worker crashes : its work needs to be re-distributed
+network trouble: part of the cluster cannot see the rest of it
+
+Zookeeper's API:
+Really a distributed file system
+	-made up of znodes(files terminology)
+	-with strong consistency guarantees
+	-some api's create,delete,exists,setData,getData,getChildren
+
+Persistent znodes:
+remain stored until explicitly deleted
+	assignment of tasks to workers must persist even if master crashes
+ephemeral nodes:
+go away if the client that created it crashes or loses its connection to 
+the zookeeper
+	if the master crashes,it should release its lock on the znode that
+indicate which node is the master
+
+Zookeeper architecture:
+zookeeper ensembles
+clients have a list of zookeeper servers to connect to
+
+zookeeper quorums:(similar to one in mongodb)
+
+#simulating a failing master with zoo keeper
+connecting to zoo keeper:
+cd /usr/hdp/current/zookeeper-client
+ls
+./zkcli.sh
+
+zookeeper looks like a file system and have sub directories for apps
+ephemeral node:
+create -e /testmaster "127.0.0.1:2223"
+#any client asking for who the master is
+get /testmaster
+quit
+
+#master now is no longer available
+./zkcli.sh
+ls
+get /testmaster
+#other clients knowing there is no current master,will register itself as the new master
+./zkclh.sh
+create -e /testmaster "127.0.0.1:2225"
+get /testmaster
+#only one master at a time
+create -e /testmaster "127.0.0.1:2226" #error -already exists
+
+
+****************************************************************************
+Oozie
+
+A system for running and scheduling hadoop tasks
+
+A multi-stage hadoop job
+	might chain together mapreduce,hive,pig,scoop and distcp tasks
+	other systems available via add ons
+A workflow is as DAG of actions
+	specified via a xml(no fancy ui)
+	cludera provides ui interface
+	so we can run actions that dont depend on each other
+
+once the xml file is written,
+execute:
+oozie job --oozie http://localhost:11000/oozie -config /home/1996m/maria_dev/job.properties -run
+
+jobs can be monitored at 
+http://127.0.0.1:11000/oozie
+
+Oozie Coordinates:
+schedules workflow execution - on periodic basis
+launches workflows based on a given start time and frequency
+Will also wait for the required input data to become available
+run in exactly same way as windows
+
+oozie bundles:(oozie 3.0)
+a bundle is a collection of coordinates that can be managed together
+Eg: several coordinates for processing log data at various levels.
+By grouping them together we can susupend them all if there were some 
+problem with log collection
+
+****************************************************************************************
+simple work flow in oozie
+
+get movielens back into mysql if it's not still there
+write a hive script to find all movies released before 1940
+set up oozie workflow that uses sqoop to extract info from mysql and analyze with hive
+
+
+mysql >
+show databases;
+create database movielens;
+use movielens;
+create * from movies limit 10;
+grant all privileges on movielens.* to ''@'localhost';
+
+hive script - oldmovies.sql
+
+DROP TABLE movies;
+CREATE EXTERNAL TABLE movies (movie_id INT, title STRING,release DATE)
+ROW FORMAT DELIMITED TERMINATED BY ',' LOCATION 'user/1996m/movies/';
+INSERT OVERWRITE DIRECTORY '${OUTPUT}' 
+SELECT * FROM movies WHERE release < '1940-01-01'
+ORDER BY release;
+
+oozie:
+workflow.xml
+get from sun dog
+
+job.properties
+contains all the variables 
+
+put all  the files appropriately so oozie can access
+
+hadoop fs -put workflow.xml /user/1996m
+hadoop fs -put oldmovies.sql /user/1996m
+#scoop to be able to mysql
+hadoop fs -put /usr/java/mysql-connector-java.jar /user/oozie/share/lib/lib 12334556/sqoop
+
+restart all
+
+oozie job --oozie http://localhost:11000/oozie -config /home/1996m/job.properties -run
+#gives job id
+
+___________________________________________________________________________________
+
+zeppelin:
+a notebook interface to your big data
+	-lets you interactively run scripts/code against data
+	-write interleaved notes and share notebooks with others on the cluster
+
+Apache spark integration
+spark code interactively - allows experimentation and exploration on big data
+execute sql queries directly against sparkSQL
+query results can be visualized in charts and graphs
+
+
+Has multiple interpretors
+
+In notebook
+%md
+###Big text
+small text
+
+sc.version
+
+%sh
+wget http://media.sundog/hadoop/u.dat /tmp/u.data
+wget http://media.sundog/hadoop/u.dat /tmp/u.data
+echo "downloaded"
+
+copy data to hdfs
+%sh
+hadoop fs -rm -r -f /tmp/ml-100k
+hadoop fs -mkdir /tmp/ml-100k
+
+hadoop fs -put /tmp/u.data /tmp/ml-100k/
+hadoop fs -put /tmp/u.item /tmp/ml-100k/
+
+scala code:
+Load data into df
+
+final case class Rating(movieID: Int , rating:Int)
+val lines = sc.textFile("hdfs":///tmp/ml-100k/u.data").map(x => {val fields = x.split("\t"); Rating(fields(1).toInt,fields(2).toInt)})
+
+import sqlContext.implicits._
+val ratingsDF = lines.toDF()
+ratingsDF.printSchema()
+
+val topMovieIDs = ratingsDF.groupBy("movieID").count().orderBy(desc("count")).cache()
+topMovieIDs.show()
+
+*********************
+using spark sql
+
+ratings.registerTempTable("ratings")
+%sql
+select * from ratings limit 10
+
+%sql
+select rating,count(*) as count from ratings group by rating
+
+final case class Movie(movieID : Int,title: String)
+val lines = sc.textFile("hdfs":///tmp/ml-100k/u.item").map(x => {val fields = x.split("\t"); Rating(fields(1).toInt,fields(2))})
+import sqlContext.implicits._
+val moviesDF = lines.toDF()
+moviesDF.show()
+
+moviesDF.registerTempTable("titiles")
+
+%sql
+select t.title, count(*) cnt from ratings r join titles t on r.movieID = t.movieID 
+group by t.title order by cnt desc limit 20
+
+_____________________________________________
+
+HUE:
+hadoop user experience
+maintained by cloudera
+
+Hortonworks(completely open source)
+	-ambari used for management and query/files UI
+	-zeppelin used for notebook
+Cloudera
+	-hue used for query/files UI and notebooks
+	-cloudera manager used for management
+
+Cloudera provides oozie editor
+	-also for spark,pig,hive,hbase,hdfs,sqoop
+
+__________________________________________________
+
+Other Administrative technologies:
+Some older systems you might hear about
+
+Ganalia:
+Distributed monitor system
+largely supplanted by ambari/cloudera manager/grafana
+might encounter in old systems - last updated in 2008
+
+Chuckwa:
+system for collecting and analyzing logs from hadoop cluster
+largely supplanted by flume and kafka which are more reliable,faster and are  of general purpose
+last updated in 2010
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,418 @@
+Spark - fast and general engine for large scale data processing
+
+driver program-spark context
+to
+cluster Manager(yarn,mesos)
+to
+executor(cache and tasks)
+
+Faster because:
+in memory 
+DAG engine optimise workflows
+
+build around RDD
+
+Components:
+Spark core
+On top of spark core - spark streaming, spark SQL - sql optimizations beyond DAG,
+			 MLlib,GraphX
+
+**********************
+Using Python here:
+scala code in spark looks lot like python code
+
+Use scala - 
+spark is written in scala
+scala's functional programming model is a good fit for distributed
+processing
+fast performance
+less code and boilerplate stuff than java
+python slow in comparision(as of spark 2.0) and uses relatively more resources
+
+************************
+RDDs
+Outside - it acts like just like a data set
+Inside - under the hood - resilient and distributed(this layer is abstracted)
+
+spark context - environment run within the driver to create and maintain spark
+creating RDD's:
+1)parallelize
+2)sc.textfile()
+3)hiveCtx = HiveContext(sc)
+4) jdbc,cassandra,Hbase,elastic search
+  structured files - json,csv,sequence files,object files
+5)Transforming Rdd's:
+	map,flatmap,filter,distinct,sample
+	union,intersection,subtract,cartesian
+
+
+map example:
+rdd = sc.parallelize([1,2,3,4])
+squaredRDD = rdd.map(lambda x:x*x)
+
+6)rdd actions:
+collect,count,countByValue,take
+top,reduce and more
+
+Lazy evaluation:
+
+**************************************
+find movie with lowest average ratings - using RDDs
+
+from pyspark import SparkConf, SparkContext
+#to convert to movie names from movie IDs 
+#python dictionary
+def loadMovieNames():
+	movieNames = {}
+	with open("ml-100k/u.item") as f:
+		for line in f:
+			fields = lines.split('|')
+			movieNames[int(fields[0])] = fields[1]
+	return movieNames
+#each line in u.data is converted to (movieID,(rating,1.0))
+def parseInput(line):
+	fields = line.split()
+	return (int(fields[1]),(float(fields[2]),1.0))
+
+if __name__ == "__main__":
+	# main script create spark context
+	conf = SparkConf().setAppName("WorstMovies")
+	sc = SparkContext(conf = conf)
+
+	# load up our movie ID -> movie name lookup table
+	movieNames = loadMovieNames()
+
+	#load up raw u.data file
+	#lines is a RDD
+	lines = sc.textFile("hdfs:///user/mona/ml-100k/u.data")
+
+	#convert to (movieID,(rating,1.0))
+	movieRatings =  lines.map(parseInput)
+
+	#reduce tp (movieID,(sumofratings,totalratings))
+	ratingTotalsandCount = movieRatings.reduceByKey(lambda movie1,movie2: (movie1[0] + movie2[0]))
+
+	# map to (movieId,averagerating)
+	averageRatings = ratingTotalsandCount.mapValues(lambda totalAndCount : totalAndCount[0] / totalAndCount[1])
+
+	#sort by average ratings
+	sortedMovies  = averageRatings.sortBy(lambda x:x[1])
+
+	#take the top 10 results
+	#action
+	results = sortedMovies.take(10)
+
+	#print them out
+	for result in results:
+		print(movieNames[result[0]],result[1])
+
+
+submitting the app:
+spark-submit lowestRatedMovieSpark.py
+
+************************************************************
+working with structured data:
+extend rdd to a dataFrame object:
+DataFrames:
+	contain row Objects
+	can run SQL queries
+	has a schema
+	read,write json,hive and parquet
+	communicate with jdbc/odbc, tableu
+
+sparkSQL in python:
+Creating a dataframe:
+from pyspark.sql import SQLContext,Row
+hiveContext = HiveContext(sc) //from hive
+inputData = spark.read.json(dataFile) //from hdfs
+inputData.createOrReplaceTempView("structuredstuff")
+myResultDataFrame = hiveContext.sql("""select foo from bar order by foobar""" )
+or do some stuff with the dataframes:
+
+myres.show()
+myres.select("somefieldname")
+myres.filter(myres("somefieldname"> 200))
+myres.groupBy(myres("somefieldname")).mean()
+myres.rdd().map(mapperfunction)//call underlying the structure
+
+datasets: dataframe is really a dataset of Row Objects
+
+
+user defined functions:
+
+from pyspark.sql.types import IntegerType
+hiveCtx.registerFunction("square",lambda x:x*x,Integertype())
+df = hiveCtx.sql("select square(someNumericField) from tableName")
+
+********************************
+finding the worst movies using dataframes:(available from spark 2)
+
+from pyspark.sql import SparkSession
+from pyspark.sql import Row
+from pyspark.sql import functions
+
+#lookup dictionary - movieID,moviename
+def loadMovieNames():
+	movieNames = {}
+	with open("ml-100k/u.item") as f:
+		for line in f:
+			fields = line.split('|')
+			movieNames[int(fields[0]] = fields[1]
+	return movieNames
+
+def parseInput(line):
+	fields = line.split()
+	return row(movieID = int(fields[1]), rating = float(fields[2]))
+
+if __name__ == "__main__":
+	#create Spark session
+	spark = sparkSession.builder.appName("PopularMovies").getOrCreate()
+
+	#load up our movie id -> dictionary
+        movieNames = loadMovieNames()
+
+	#get the raw data
+	lines = spark.sparkContext.textFile("hdfs:///user/1996mona/ml-100k/u.data")
+
+	#convert the rdd of row of objects with (movieID,rating)
+	movies = lines.map(parseInput)
+
+	#convert that to dataframe
+	movieDataset = spark.createDataFrame(movies)
+
+	#compute average rating for each movieID
+	averageRatings = movieDataset.groupBy("movieID").avg("rating")
+
+	#compute count of ratings for each movieID
+	counts = movieDataSet.groupBy("movieID").count()
+
+	#join the two together
+	averagesAndCounts = counts.join(averageRatings,"movieID")
+
+	#pull the top 10 results
+	topTen = averageAndCounts.orderBy("avg(rating)").take(10)
+
+	#print all of the out,converting movie IDs to names as we go
+	for movie in topTen:
+		print(movieNames[movie[0]],movie[1],movie[2])
+
+	#stop the session
+	spark.stop()
+
+
+********************************************************************************
+Movie recommendation with MLlib
+
+from pyspark.sql import SparkSession
+from pyspark.ml.recommendations import ALS
+from pyspark.sql import Row
+from pyspark.sql.functions import lit
+
+#load up movieID -> movie name dictionary
+def loadMovieNames():
+	movieNames = {}
+	with open("ml-100k/u.item") as f:
+		for line in f:
+			fields = line.split('|')
+			movieNames[int(fields[0])] = fields[1].decode('ascii','ignore')
+	return movieNames
+
+#convert u.data lines into (userID,movieID,rating) rows
+def parseInput(line):
+	fields = line.value.split()
+	return Row(userID = int(fields[0]), movieID = int(fields[1]),rating = float(fields[2]))
+	
+if __name__ == "__main__"
+	#create a sparksession (the config bit is only for windows)
+	spark = SparkSession.builder.appName("MovieRecs").getOrCreate()
+
+	#load up our movie ID -> name dictionary
+	movieNames = loadMovieNames()
+
+	#get the raw data - spark.read returns df - convert rdd
+	lines = spark.read.text("hdfs://user/1996mona10/ml-100k/u.data").rdd
+
+	#convert it to a rdd of row of objects with (userID, movieID , rating)
+	ratingsRDD = lines.map(parseInput)
+
+	# Convert to a DataFrame and cache it
+	ratings = spark.createDataFrame(ratingsRDD).cache()
+
+	#create an ALS collaborative filtering model from complete data set
+	ald = ALS(maxIter = 5,regParam = 0.01, userCol = "userID", itemCol = "movieID",ratingCol = "rating")
+	#train model
+	model = als.fit(ratings)
+
+	#print out ratings from user 0:
+	print("ratings for user ID 0:")
+	userRatings = ratings.filter("userID = 0")
+	for rating in userRatings.collect():
+		print movieNames[rating['movieID']],rating['rating']
+	
+	print("\n Top 20 recommendations:")
+	#find movies rated more than 100 times
+	ratingCounts = rating.groupBy("movieID").count().filter("count > 100")
+
+	#construct a "test" dataframe for user 0 with every movie rated more than 100 times
+	popularMovies = ratingCounts.select("movieID").withColumn('userID',lit(0))
+
+	#run our model on that list of popular movies for user ID 0
+	recommendations = model.transform(popularMovies)
+	
+	#get the top 20 movies with the highest predicted rating for this user
+	topRecommendations = recommendations.sort(recommendations.prediction.desc()).take(20)
+
+	for recommendation in topRecommendations:
+		print(movieNames[recommendation['movieID']], recommendation['prediction'])
+
+	spark.stop()
+
+******************************************************************************
+filter  the lowest rated movies by number of ratings - using rdds
+
+for this, consider movies which are rated by atleast 10 people
+
+from pyspark import SparkConf, SparkContext
+#to convert to movie names from movie IDs 
+#python dictionary
+def loadMovieNames():
+	movieNames = {}
+	with open("ml-100k/u.item") as f:
+		for line in f:
+			fields = lines.split('|')
+			movieNames[int(fields[0])] = fields[1]
+	return movieNames
+#each line in u.data is converted to (movieID,(rating,1.0))
+def parseInput(line):
+	fields = line.split()
+	return (int(fields[1]),(float(fields[2]),1.0))
+
+if __name__ == "__main__":
+	# main script create spark context
+	conf = SparkConf().setAppName("WorstMovies")
+	sc = SparkContext(conf = conf)
+
+	# load up our movie ID -> movie name lookup table
+	movieNames = loadMovieNames()
+
+	#load up raw u.data file
+	#lines is a RDD
+	lines = sc.textFile("hdfs:///user/mona/ml-100k/u.data")
+
+	#convert to (movieID,(rating,1.0))
+	movieRatings =  lines.map(parseInput)
+
+	#reduce tp (movieID,(sumofratings,totalratings))
+	ratingTotalsandCount = movieRatings.reduceByKey(lambda movie1,movie2: (movie1[0] + movie2[0]))
+
+	# filter out movies rated 10 or fewer times
+	popularTotalsandCount = ratingTotalsandCount.filter(lambda x: x[1][1] > 10)
+
+	#map to (movieID, averageRatings)
+	averageRatings = PopularTotalsAndCount.mapValues(lambda totalAndCount : totalAndCount[0] / totalAndCount[1])
+
+	#sort by average ratings
+	sortedMovies  = averageRatings.sortBy(lambda x:x[1])
+
+	#take the top 10 results
+	#action
+	results = sortedMovies.take(10)
+
+	#print them out
+	for result in results:
+		print(movieNames[result[0]],result[1])
+
+
+**************************************************************************
+filter  the lowest rated movies by number of ratings - using dataframes
+
+from pyspark.sql import SparkSession
+from pyspark.sql import Row
+from pyspark.sql import functions
+
+def loadMovieNames():
+	movieNames = {}
+	with open("ml-100k/u.item") as f:
+		for line in f:
+			fields = line.split('|')
+			movieNames[int(fields[0]] = fields[1]
+	return movieNames
+
+def parseInput(line):
+	fields = line.split()
+	return row(movieID = int(fields[1]), rating = float(fields[2]))
+
+if __name__ == "__main__":
+	#create Spark session
+	spark = sparkSession.builder.appName("PopularMovies").getOrCreate()
+
+	#load up our movie id -> dictionary
+        movieNames = loadMovieNames()
+
+	#get the raw data
+	lines = spark.sparkContext.textFile("hdfs:///user/1996mona/ml-100k/u.data")
+
+	#convert the rdd of row of objects with (movieID,rating)
+	movies = lines.map(parseInput)
+
+	#convert that to dataframe
+	movieDataset = spark.createDataFrame(movies)
+
+	#compute average rating for each movieID
+	averageRatings = movieDataset.groupBy("movieID").avg("rating")
+
+	#compute count of ratings for each movieID
+	counts = movieDataSet.groupBy("movieID").count()
+
+	#join the two together
+	averagesAndCounts = counts.join(averageRatings,"movieID")
+
+	#filter movies rated 10 or fewer times
+	popularAveragesAndCounts = averagesAndCounts.filter("count > 10")
+
+	#pull the top 10 results
+	topTen = averageAndCounts.orderBy("avg(rating)").take(10)
+
+	#print all of the out,converting movie IDs to names as we go
+	for movie in topTen:
+		print(movieNames[movie[0]],movie[1],movie[2])
+
+	#stop the session
+	spark.stop()
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

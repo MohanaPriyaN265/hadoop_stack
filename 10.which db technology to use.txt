@@ -1,0 +1,70 @@
+choosing your database:
+External tables to handle requests from
+mysql
+hbase
+cassandra
+mongoDb
+
+Integration configurations
+Scaling requirements - transaction rates
+support considerations
+	-take care of security issues
+budget considerations - probably not much concern
+
+
+CAP considerations - depending about type of application
+	-the theorem is not a hard and fast rule
+	- lines are getting blurred between these 
+
+
+
+Simplicity
+
+case studies:
+1)building an internal phone directory app
+	scale - limited
+	consistency - eventual is fine
+	availability - not mission critical
+	mysql
+
+
+2)system mine web server logs for interesting patterns
+	-most popular times of the day,average session length
+
+	can do offline work
+	just by importing log data into hdfs
+	spark job to analyze internally
+	no need to set up external tables
+	none of the sql,no-sql is needed
+
+3)big spark job for movie recommendations for end users
+	something needs to vend this data to your web application
+	big company 
+	downtime not tolerated
+	must be fast
+	eventual consistency ok
+
+	Ans:cassandra
+
+4)building a massive stock trading system
+	consistency is more important
+		i.e reads needs to be immediate
+	big data is present
+	need professional support and need security
+	ans: better answer:mongoDB,
+	
+	not a wrong answer,but some things to consider
+	 hbase - might not have professional support
+		but maybe preferred if we have hadoop cluster already exists
+	 cassandra - provides consitency options
+	 mysql - if scalability is not high,and can be sharded
+
+CAP theorem is more of a guidance
+
+
+
+
+
+	
+	
+
